@@ -3,34 +3,58 @@ import { readdir } from "node:fs/promises";
 import { setColor } from '../helpers/colors';
 
 
+interface paths {
+    RootDirectory: string,
+    ConfigFile: string,
+    DirectoryList: { [key: string]: any }
+}
+
 //Generate Data Paths File Structure
 class pathObject {
 
-    paths: { [key: string]: string } = {
-        dataStorage: '',
-        config: '',
-    };
+    paths: paths = {
+        RootDirectory: '',
+        ConfigFile: '',
+        DirectoryList: {}
+    }
 
-    constructor(_dataFolder: string, _pathArray: string[]) {
-        this.paths.dataStorage = _dataFolder;
-        this.paths.config = _dataFolder + '/config.json';
+
+    constructor(_rootDirectory: string, _pathArray: string[]) {
+        this.paths.RootDirectory = _rootDirectory;
+        this.paths.ConfigFile = _rootDirectory + '/config.json';
         for (let _path of _pathArray) {
-            this.paths[_path] = _dataFolder + '/' + _path;
+            this.paths.DirectoryList[_path] = _rootDirectory + '/' + _path;
         }
     }
 
     async ensurePaths() {
-        //Check If Paths Exist
-        for (let _dataPath of Object.entries(this.paths)) {
+
+        //Check If Root Directory Exists
+        if ((await fs.pathExists(this.paths.RootDirectory)) == false) {
+            await fs.ensureDir(this.paths.RootDirectory);
+        }
+
+        //Check If Config File Exists
+        if ((await fs.pathExists(this.paths.ConfigFile)) == false) {
+            await fs.outputJson(this.paths.ConfigFile, {});
+        }
+
+        //load Config File
+        this.paths = await fs.readJson(this.paths.ConfigFile);
+
+        //Check If Directory Paths Exist
+        for (let _dataPath of Object.entries(this.paths.DirectoryList)) {
+            console.log(_dataPath);
             //Ensure It Exists if not
-            if (await fs.pathExists(_dataPath[1]) == false) {
-                if (JSON.stringify(_dataPath[1]).includes('.json')) {
+            if ((await fs.pathExists(_dataPath[1])) == false) {
+                if (_dataPath[1].includes('.json')) {
                     await fs.outputJson(_dataPath[1], {});
                 } else {
                     await fs.ensureDir(_dataPath[1]);
                 }
             }
         }
+
     };
 }
 
@@ -99,9 +123,33 @@ export class DataManager {
     };
 
     async injectPath(_path: string) {
-        this.dataPaths.paths[_path] = this.dataPaths.paths.dataStorage + '/' + _path;
+        this.dataPaths.paths.DirectoryList[_path] = this.dataPaths.paths.RootDirectory + '/' + _path;
         await this.dataPaths.ensurePaths();
         console.log(await setColor(` • Path Injected (${_path})`, 'magenta'));
+    }
+
+    async loadDataBase(_path: string) {
+
+        if(await this.retrieveData(_path)){
+            
+            
+            
+            
+            console.log(await setColor(` • Database Loaded (${_path})`, 'magenta'));
+        }
+
+    }
+
+    async saveDataBase() {
+        //await this.retrieveData(this.dataPaths.paths.config);
+
+        await this.saveData(this.dataPaths.paths.ConfigFile, JSON.parse(JSON.stringify(this.dataPaths.paths)));
+
+
+    }
+
+    async getRootDirectory() {
+        return this.dataPaths.paths.RootDirectory;
     }
 
 
